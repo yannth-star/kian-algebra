@@ -165,7 +165,8 @@ button:focus-visible,input:focus-visible,.choice:focus-visible{outline:3px solid
 @media (max-width:560px){.att summary{grid-template-columns:1fr auto}.att .when{grid-column:1/-1}}
 
 /* units, concepts, typed answers */
-.tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:16px}
+@media (max-width:420px){.tab{padding:8px 10px}.tab span{font-size:12px}}
 .tab{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1.5px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;min-width:0}
 .tab span{color:var(--muted);font-size:13px}
 .tab.on{border-color:var(--accent);background:var(--accent-soft)}
@@ -203,6 +204,21 @@ button:focus-visible,input:focus-visible,.choice:focus-visible{outline:3px solid
 .fr{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.2}
 .fr > span:first-child{border-bottom:1.5px solid currentColor;padding:0 6px 2px}
 .fr > span:last-child{padding:2px 6px 0}
+.att.wk summary{grid-template-columns:44px 1fr auto}
+.att.wk .when{font-family:var(--f-display);font-weight:700;font-size:18px;color:var(--accent)}
+.att.wk .res{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.stat3{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.callout{background:var(--half-soft);border-radius:12px;padding:12px 16px;margin:0 0 16px}
+.sform{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.sform .wide{grid-column:1/-1}
+.sform input[type=text],.sform input[type=number],.sform input[type=date],.sform select,.sform textarea{font:inherit;font-size:16px;padding:8px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);width:100%}
+.topics{display:flex;flex-wrap:wrap;gap:8px}
+.topics label{display:inline-flex;align-items:center;gap:6px;border:1.5px solid var(--line);border-radius:99px;padding:5px 12px;font-size:14px;font-weight:400;color:var(--ink);background:var(--bg);cursor:pointer}
+.topics input{width:auto;padding:0;border:0;margin:0;flex:none;accent-color:var(--accent)}
+.topics label{flex:1 1 220px}
+.topics input:checked + span{font-weight:700;color:var(--accent)}
+.table td.nw{white-space:nowrap}
+@media (max-width:560px){.att.wk summary{grid-template-columns:36px 1fr}.att.wk .res{grid-column:2;justify-content:flex-start}.att.wk .when{grid-column:auto}}
 .banwrap{padding-block:0}
 .banwrap:not([hidden]){padding-block:16px 0}
 .banner{display:flex;flex-direction:column;gap:4px;background:var(--bad-soft);border:2px solid var(--bad);border-radius:12px;padding:12px 16px;color:var(--ink)}
@@ -1627,6 +1643,8 @@ const unitSecs=u=>SECTIONS.filter(s=>s.unit===u);
 /* ---- saved results (Supabase) ---- */
 let SB=null,SESSION=null,ROLE=null,MEMBERS=[];
 const rowToAtt=r=>({id:r.id,uid:(r.owner_email||'').toLowerCase(),sec:r.sec,startedAt:Date.parse(r.started_at),updatedAt:Date.parse(r.updated_at),total:r.total,answered:r.answered,finished:r.finished,points:Number(r.points),pct:r.pct,items:r.items||[]});
+let SCHOOL=[],IUNIT=null;
+const rowToSchool=r=>({id:r.id,student:(r.student_email||'').toLowerCase(),unit:r.unit,name:r.test_name||'',on:r.taken_on,score:Number(r.score),outOf:Number(r.out_of),topics:r.topics||[],note:r.note||''});
 const attToRow=(id,a)=>({id,owner_email:ME,sec:a.sec,started_at:new Date(a.startedAt).toISOString(),updated_at:new Date(a.updatedAt).toISOString(),total:a.total,answered:a.answered,finished:a.finished,points:a.points,pct:a.pct,items:a.items});
 async function initDB(){
   try{
@@ -1640,7 +1658,7 @@ let authBusy=false;
 async function afterAuth(){
   if(authBusy)return;authBusy=true;
   try{
-    if(!SESSION){ME=null;ROLE=null;OWNER=false;ATT=[];READS=[];dbState='signedout';rerender();return}
+    if(!SESSION){ME=null;ROLE=null;OWNER=false;ATT=[];READS=[];SCHOOL=[];dbState='signedout';rerender();return}
     ME=(SESSION.user.email||'').toLowerCase();
     const m=await SB.from('algebra_members').select('email,role,name');
     if(m.error)throw m.error;
@@ -1654,13 +1672,16 @@ async function afterAuth(){
 }
 async function refresh(){
   if(!SB||dbState!=='on')return;
-  const [a,r]=await Promise.all([SB.from('algebra_attempts').select('*').order('started_at',{ascending:false}).limit(5000),SB.from('algebra_reads').select('*').order('at',{ascending:false}).limit(2000)]);
+  const [a,r,sc]=await Promise.all([SB.from('algebra_attempts').select('*').order('started_at',{ascending:false}).limit(5000),SB.from('algebra_reads').select('*').order('at',{ascending:false}).limit(2000),SB.from('algebra_school_tests').select('*').order('taken_on',{ascending:false}).limit(500)]);
   if(!a.error)ATT=a.data.map(rowToAtt);
+  if(!sc.error)SCHOOL=sc.data.map(rowToSchool);
   if(!r.error)READS=r.data.map(x=>({id:x.id,uid:(x.owner_email||'').toLowerCase(),unit:x.unit,kind:x.kind||'page',sec:x.sec,secs:x.secs,at:Date.parse(x.at)}));
-  if(VIEW==='home'||VIEW==='progress')rerender();else{banner();updateSaveNote()}
+  const sf=document.getElementById('sform');
+  if(VIEW==='insights'&&sf&&sf.dataset.dirty)banner();
+  else if(VIEW==='home'||VIEW==='progress'||VIEW==='insights')rerender();else{banner();updateSaveNote()}
 }
 async function loadNames(){}
-function rerender(){banner();if(VIEW==='home')home();else if(VIEW==='progress')progress();else updateSaveNote()}
+function rerender(){banner();if(VIEW==='home')home();else if(VIEW==='progress')progress();else if(VIEW==='insights')insights();else updateSaveNote()}
 function pendingCount(){const o=outbox();return Object.keys(o).filter(id=>!(S&&S.lid===id&&dbState==='on')).length}
 function saveNoteText(){
   const n=pendingCount();
@@ -1687,6 +1708,7 @@ function save(){
   const body={owner:ME||null,uid:ME||'',sec:S.sec,startedAt:S.started,updatedAt:Date.now(),total:n,answered:done.length,
     finished:done.length===n,points:pts,pct:Math.round(100*pts/n),items:S.items.map(x=>x||null)};
   const o=outbox();o[S.lid]=body;setOutbox(o);
+  if(isTest(S.sec)){const pz=pausedAll();if(body.finished)delete pz[S.sec];else pz[S.sec]={owner:ME||null,qs:S.qs,res:S.res.map(r=>r||null),items:S.items.map(x=>x||null),started:S.started,lid:S.lid,savedAt:Date.now()};setPaused(pz)}
   flush();
 }
 let flushing=false,again=false;
@@ -1801,18 +1823,22 @@ function home(){
   <div class="tabs" role="tablist">${Object.entries(UNITS).sort((a,b)=>b[0]-a[0]).map(([id,u])=>`<button role="tab" class="tab ${id===UNIT?'on':''}" aria-selected="${id===UNIT}" data-unit="${id}"><strong>${u.name}</strong><span>${u.title}</span></button>`).join('')}</div>
   <div class="duo">
     <button class="concard" id="toconcepts"><span class="eyebrow">Start here</span><strong>${U.name} key concepts</strong><span class="d">Rules, a worked example and common mistakes for each lesson, ${first} to ${last}.</span><span class="go">Read →</span></button>
-    <div class="test"><div><h2>Practice test</h2><p>${secs.length*2} questions, 2 from each lesson. ${bt!=null?`Best so far: ${bt}%.`:''}</p></div><button class="btn" data-go="${U.test}">Start test</button></div>
+    ${(()=>{const pz=pausedFor(U.test);return pz?`<div class="test"><div><h2>Test in progress</h2><p>${pz.done} of ${pz.total} answered. Pick up where you stopped. ${bt!=null?`Best so far: ${bt}%.`:''}</p></div><div class="actions"><button class="btn" id="resumetest">Resume test</button><button class="btn ghost" style="color:inherit" data-go="${U.test}">Start a new one</button></div></div>`
+    :`<div class="test"><div><h2>Practice test</h2><p>${secs.length*2} questions, 2 from each lesson. ${bt!=null?`Best so far: ${bt}%.`:''}</p></div><button class="btn" data-go="${U.test}">Start test</button></div>`})()}
   </div>
   ${U.reviews?`<h2 class="sub">Unit review practice</h2><p class="tip" style="margin:-4px 0 10px">R1 and R2 follow the teacher's ${U.name} review sheet. ± drills the sign rules. New numbers every time.</p>
   <div class="list" style="margin-bottom:20px">${U.reviews.map((r,i)=>{const n=finishedFor(r,FILTER==='all'?null:FILTER).length;return `<button class="row" data-go="${r}"><span class="num">${REVIEW_TAG[r]}</span><span><span class="t">${REVIEW_NAMES[r]}</span><span class="d">${REVIEW_DESC[r]}${n?` · ${n} done`:''}</span></span>${chip(best(r))}</button>`}).join('')}</div>
   <h2 class="sub">Lessons</h2>`:''}
   <div class="list">${secs.map(s=>{const n=finishedFor(s.id,FILTER==='all'?null:FILTER).length;return `<button class="row" data-go="${s.id}"><span class="num">${s.id}</span><span><span class="t">${s.title}</span><span class="d">${s.desc}${n?` · ${n} set${n>1?'s':''} done`:''}</span></span>${chip(best(s.id))}</button>`}).join('')}</div>
+  <button class="progbtn" id="toins"><span><strong>Tests and weak spots</strong><span class="d">Every test taken, scores over time, and which lessons need the most work.</span></span><span aria-hidden="true">→</span></button>
   <button class="progbtn" id="toprog"><span><strong>Progress log</strong><span class="d">${sets?`${sets} set${sets>1?'s':''} saved. See scores over time and every missed question.`:'Every set is saved here as you go.'}</span></span><span aria-hidden="true">→</span></button>
   <p class="how">Scoring: right on the first try is 1 point, right after a retry is ½ point, and using “Show solution” is 0. Type fractions like <span class="m">3/4</span>, powers like <span class="m">x^2</span>.</p>
   <p class="tip" id="savenote">${saveNoteText()}</p>`;
   app.querySelectorAll('[data-unit]').forEach(b=>b.onclick=()=>{UNIT=b.dataset.unit;pref.set('alg-unit',UNIT);home()});
   app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>start(b.dataset.go));
   document.getElementById('toprog').onclick=progress;
+  document.getElementById('toins').onclick=()=>{IUNIT=UNIT;insights()};
+  const rt=document.getElementById('resumetest');if(rt)rt.onclick=()=>resume(U.test);
   document.getElementById('toconcepts').onclick=()=>concepts(UNIT);
   const so=document.getElementById('signout');if(so)so.onclick=signOut;
 }
@@ -1833,16 +1859,33 @@ function concepts(u,jump){
       <div class="watch"><span class="eyebrow">Watch out</span><ul>${c.watch.map(x=>`<li>${x}</li>`).join('')}</ul></div>
       <div class="actions"><button class="btn primary" data-go="${s.id}">Practice ${s.id}</button></div>
     </section>`}).join('')}</div>
-  <div class="test" style="margin-top:20px"><div><h2>Ready?</h2><p>Take the ${U.name} practice test: ${secs.length*2} questions from every lesson.</p></div><button class="btn" data-go="${U.test}">Start test</button></div>`;
+  <div class="test" style="margin-top:20px"><div><h2>Ready?</h2><p>Take the ${U.name} practice test: ${secs.length*2} questions from every lesson.</p></div><button class="btn" data-go="${U.test}">${pausedFor(U.test)?'Resume test':'Start test'}</button></div>`;
   document.getElementById('back').onclick=home;
-  app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>start(b.dataset.go));
+  app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>(isTest(b.dataset.go)?openTest:start)(b.dataset.go));
   app.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>document.getElementById('c-'+b.dataset.jump.replace('.','-')).scrollIntoView({behavior:'smooth',block:'start'}));
   if(jump){const el=document.getElementById('c-'+jump.replace('.','-'));if(el)el.scrollIntoView();}else window.scrollTo(0,0);
   logRead(u);trackConcepts(u);
 }
 
 /* ---- quiz ---- */
-function start(sec){leaveConcepts();S={sec,qs:makeSet(sec),i:0,res:[],items:[],started:Date.now(),ref:null};VIEW='quiz';show();window.scrollTo(0,0)}
+/* ---- paused tests: the exact question set is kept on this device so a test can be finished later ---- */
+function pausedAll(){try{return JSON.parse(localStorage.getItem('alg-paused')||'{}')||{}}catch(e){return {}}}
+function setPaused(o){try{localStorage.setItem('alg-paused',JSON.stringify(o))}catch(e){}}
+function clearPaused(sec){const o=pausedAll();if(o[sec]){delete o[sec];setPaused(o)}}
+function pausedFor(sec){
+  const p=pausedAll()[sec];if(!p||!Array.isArray(p.qs)||!p.qs.length)return null;
+  if(p.owner&&ME&&p.owner!==ME)return null;
+  const done=(p.res||[]).filter(Boolean).length;if(done<1||done>=p.qs.length)return null;
+  return {...p,done,total:p.qs.length};
+}
+function start(sec){leaveConcepts();clearPaused(sec);S={sec,qs:makeSet(sec),i:0,res:[],items:[],started:Date.now(),ref:null};VIEW='quiz';show();window.scrollTo(0,0)}
+function resume(sec){
+  const p=pausedFor(sec);if(!p)return start(sec);
+  leaveConcepts();const res=p.res.map(r=>r||undefined);let i=0;while(i<p.qs.length&&res[i])i++;
+  S={sec,qs:p.qs,i,res,items:p.items.map(x=>x||undefined),started:p.started,lid:p.lid,ref:null};
+  VIEW='quiz';show();window.scrollTo(0,0);
+}
+const openTest=sec=>pausedFor(sec)?resume(sec):start(sec);
 const KEYS=[['^2','x²'],['^3','x³'],['^','^'],['(','('],[')',')']];
 function fieldHTML(f,j){
   if(f.kind==='expr'){const keys=KEYS.concat(/y/.test(f.ans)?[['y','y']]:[]);
@@ -1994,12 +2037,13 @@ function progress(){
   app.innerHTML=`
   <div class="bar"><button class="btn ghost" id="back">← All lessons</button><span class="eyebrow">Progress log</span></div>
   <div class="head"><h1>Progress</h1><p class="lede">Every set is saved as it is played. Open a set to see the questions that were missed, the right answer, and what was tried.</p>
-  <div class="actions"><button class="btn small" id="prefresh">Refresh</button>${OWNER?'<button class="btn small" id="pcsv">Download results (CSV)</button><button class="btn small" id="pjson">Download full backup</button>':''}</div></div>
+  <div class="actions"><button class="btn small primary" id="pins">Tests and weak spots</button><button class="btn small" id="prefresh">Refresh</button>${OWNER?'<button class="btn small" id="pcsv">Download results (CSV)</button><button class="btn small" id="pjson">Download full backup</button>':''}</div></div>
   ${people.length>1?`<div class="filters"><button class="fbtn ${FILTER==='all'?'on':''}" data-f="all">Everyone</button>${people.map(p=>`<button class="fbtn ${FILTER===p?'on':''}" data-f="${esc(p)}">${esc(who(p))}</button>`).join('')}</div>`:''}
   ${body}`;
   app.querySelectorAll('details.att').forEach(d=>d.addEventListener('toggle',()=>{d.open?OPEN.add(d.dataset.id):OPEN.delete(d.dataset.id)}));
   document.getElementById('back').onclick=home;
   document.getElementById('prefresh').onclick=()=>refresh();
+  document.getElementById('pins').onclick=()=>{IUNIT=UNIT;insights()};
   const pc=document.getElementById('pcsv');if(pc)pc.onclick=exportCSV;const pj=document.getElementById('pjson');if(pj)pj.onclick=exportJSON;
   app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>start(b.dataset.go));
   app.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;progress()});
@@ -2007,6 +2051,160 @@ function progress(){
     if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Click again to remove for good';b.classList.add('danger');return}
     b.disabled=true;const {error}=await SB.from('algebra_attempts').delete().eq('id',b.dataset.rm);if(error){b.textContent='Could not remove it. Try again.';b.disabled=false;b.dataset.armed=''}else refresh();
   });
+}
+
+/* ---- tests and weak spots ---- */
+const SKIP_MIN=3,MIN_Q=5;
+const isUnitTest=sec=>sec==='test'||sec==='test3'||sec==='test4';
+const minsOf=a=>Math.max(0,((a.updatedAt||0)-(a.startedAt||0))/60000);
+const skipped=a=>!!(a.finished&&isTest(a.sec)&&a.total>=10&&minsOf(a)<SKIP_MIN);
+const dur=a=>{const m=Math.round(minsOf(a));return m>=180?'paused':m<1?'under 1 min':m+' min'};
+const pct0=(n,d)=>d?Math.round(100*n/d):null;
+const fmtShort=ms=>new Date(ms).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const fmtDay=d=>{const t=new Date(d+'T12:00:00');return isNaN(t)?d:t.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})};
+const fmtScore=n=>Number.isInteger(n)?String(n):String(Math.round(n*10)/10);
+function lessonStats(rows,schools){
+  const st={};SECTIONS.forEach(x=>{st[x.id]={pn:0,pf:0,tn:0,tf:0,tr:0,ts:0,help:0,miss:[],school:0}});
+  rows.forEach(a=>{if(skipped(a))return;const T=isUnitTest(a.sec);
+    (a.items||[]).forEach(it=>{if(!it||!st[it.sec])return;const x=st[it.sec];
+      if(T){x.tn++;if(it.r==='first')x.tf++;else if(it.r==='retry')x.tr++;else x.ts++;if(it.hint||it.peek)x.help++;
+        if(it.r!=='first')x.miss.push({at:a.startedAt,q:it.q,ans:it.ans,wrong:it.wrong||[],r:it.r})}
+      else{x.pn++;if(it.r==='first')x.pf++}})});
+  schools.forEach(t=>(t.topics||[]).forEach(id=>{if(st[id])st[id].school++}));
+  return st;
+}
+function lessonVerdict(x){
+  const tF=x.tn>=MIN_Q?pct0(x.tf,x.tn):null,pF=x.pn>=MIN_Q?pct0(x.pf,x.pn):null;
+  let label,tone,rank;
+  if(tF==null&&pF==null){label='Not enough data yet';tone='';rank=500}
+  else if(tF==null){label=pF>=85?'Practice solid, no test data yet':'Practice still shaky';tone=pF>=85?'good':'half';rank=pF>=85?300:150}
+  else if(tF<60){label='Weak on tests';tone='bad';rank=tF}
+  else if(pF!=null&&pF-tF>=20){label='Slips on tests';tone='half';rank=tF+10}
+  else if(tF>=75){label='Solid';tone='good';rank=200+tF}
+  else{label='Keep watching';tone='half';rank=tF+30}
+  if(x.school){rank-=15*x.school;if(tone==='good'||tone===''){tone='half'}}
+  return {tF,pF,label,tone,rank};
+}
+function insights(){
+  leaveConcepts();
+  if(VIEW!=='insights'&&!progLoading&&dbState==='on'){progLoading=true;setTimeout(()=>refresh().finally(()=>{progLoading=false}),0)}
+  VIEW='insights';S=null;
+  const ALL=allAtt(),people=[...new Set(ALL.map(a=>a.uid))];
+  if(FILTER!=='all'&&!people.includes(FILTER))FILTER='all';
+  if(!IUNIT||!UNITS[IUNIT])IUNIT=UNIT;
+  const U=UNITS[IUNIT],secs=unitSecs(IUNIT);
+  const rows=ALL.filter(a=>FILTER==='all'||a.uid===FILTER);
+  const schools=SCHOOL.filter(t=>t.unit===IUNIT&&(FILTER==='all'||t.student===FILTER));
+  const tests=rows.filter(a=>isTest(a.sec)&&unitOf(a.sec)===IUNIT).sort((a,b)=>b.startedAt-a.startedAt);
+  const real=tests.filter(a=>a.finished&&!skipped(a)),unitReal=real.filter(a=>a.sec===U.test).sort((a,b)=>a.startedAt-b.startedAt);
+  const nSkip=tests.filter(skipped).length,nUnfin=tests.filter(a=>!a.finished).length;
+  const avg=unitReal.length?Math.round(unitReal.reduce((t,a)=>t+a.pct,0)/unitReal.length):null;
+  const bestPct=unitReal.length?Math.max(...unitReal.map(a=>a.pct)):null,lastT=unitReal[unitReal.length-1];
+  const stats=lessonStats(rows,schools);
+  const ranked=secs.map(x=>({sec:x,st:stats[x.id],v:lessonVerdict(stats[x.id])})).sort((a,b)=>a.v.rank-b.v.rank);
+  const slips=ranked.filter(r=>r.v.label==='Slips on tests');
+  const next=ranked.filter(r=>r.v.tone==='bad'||r.v.label==='Slips on tests'||r.v.label==='Keep watching'||r.v.label==='Practice still shaky').slice(0,3);
+  const canEnter=OWNER&&dbState==='on';
+  const studs=MEMBERS.filter(m=>m.role==='student');
+  const lessonTag=id=>{const o=secObj(id);return o?`${id} ${o.title}`:id};
+
+  const histRows=tests.map(a=>{
+    const when=fmtShort(a.startedAt),paused=!a.finished&&pausedFor(a.sec)&&pausedFor(a.sec).lid===a.id;
+    const score=a.finished?`<span class="chip ${cls(a.pct)}">${a.pct}%</span> <span class="d">${fmtScore(a.points)} of ${a.total}</span>`:`<span class="d">${a.answered||0} of ${a.total} answered</span>`;
+    const note=skipped(a)?'<span class="chip bad">Skipped through, not counted</span>':!a.finished?(paused?'<span class="chip half">Paused, can resume</span>':'<span class="chip half">Unfinished, not counted</span>'):'';
+    return `<tr><td class="n nw">${when}</td><td><strong>${esc(secName(a.sec))}</strong>${people.length>1?` <span class="d">· ${esc(who(a.uid))}</span>`:''}</td><td class="n">${a.total}</td><td>${score}</td><td class="n nw">${a.finished||a.answered?dur(a):'–'}</td><td>${note}</td></tr>`}).join('');
+
+  const lessonRows=ranked.map(({sec:x,st,v})=>{
+    const miss=st.miss.sort((a,b)=>b.at-a.at).slice(0,6);
+    const chips=[`<span class="chip ${v.tone}">${v.label}</span>`,
+      st.tn?`<span class="chip">Test ${st.tn>=MIN_Q?pct0(st.tf,st.tn)+'%':'?'} · ${st.tn} q</span>`:'<span class="chip">No test yet</span>',
+      st.pn?`<span class="chip">Practice ${st.pn>=MIN_Q?pct0(st.pf,st.pn)+'%':'?'} · ${st.pn} q</span>`:'',
+      st.school?`<span class="chip bad">Lost points at school${st.school>1?` ×${st.school}`:''}</span>`:''].join('');
+    return `<details class="att wk" data-id="ins-${x.id}"${OPEN.has('ins-'+x.id)?' open':''}><summary><span class="when">${x.id}</span><span class="what"><strong>${x.title}</strong></span><span class="res">${chips}</span></summary>
+      <div class="attbody">
+        <p class="d" style="margin:0">${st.tn?`On tests: ${pct0(st.tf,st.tn)}% right first try, ${pct0(st.tr,st.tn)}% after a retry, ${pct0(st.ts,st.tn)}% needed the solution${st.help?`, and ${pct0(st.help,st.tn)}% used a hint or the key concepts`:''}.`:'No test questions from this lesson yet.'} ${st.pn?`In lesson practice: ${pct0(st.pf,st.pn)}% right first try (${st.pn} questions).`:'No lesson practice yet.'} Percentages need at least ${MIN_Q} questions to be shown.</p>
+        ${miss.length?`<ol class="missed">${miss.map(m=>`<li><span class="d">${fmtDate(m.at)} · ${m.r==='retry'?'right after a retry':'used the solution'}</span><span>${esc(m.q)}</span><span><b>Correct:</b> ${esc(m.ans)}</span>${m.wrong.length?`<span><b>Tried:</b> ${m.wrong.map(esc).join(' → ')}</span>`:''}</li>`).join('')}</ol>`:''}
+        <div class="actions"><button class="btn small" data-go="${x.id}">Practice ${x.id}</button><button class="btn small ghost" data-conc="${x.id}">Key concepts</button></div>
+      </div></details>`}).join('');
+
+  const schoolRows=schools.map(t=>{const p=t.outOf?Math.round(1000*t.score/t.outOf)/10:null;
+    return `<div class="att"><div class="attbody" style="gap:6px"><div class="actions"><strong>${fmtDay(t.on)}</strong><span>${esc(t.name||`${U.name} school test`)}</span><span class="chip ${p==null?'':cls(p)}">${fmtScore(t.score)} / ${fmtScore(t.outOf)}${p!=null?` · ${fmtScore(p)}%`:''}</span></div>
+      ${t.topics&&t.topics.length?`<span class="d">Lost points on: ${t.topics.map(i=>esc(lessonTag(i))).join(', ')}</span>`:''}${t.note?`<span class="d">${esc(t.note)}</span>`:''}
+      ${canEnter?`<button class="btn ghost small" data-srm="${t.id}">Remove</button>`:''}</div></div>`}).join('');
+  const schoolCmp=schools.length&&unitReal.length?`<p class="tip" style="margin:0 0 10px">In-app ${U.name} practice tests: average ${avg}%, best ${bestPct}% over ${unitReal.length} finished attempt${unitReal.length>1?'s':''}.</p>`:'';
+
+  const form=canEnter?`<form id="sform" class="card" autocomplete="off"><h3 style="margin:0">Log a school test</h3>
+    <div class="sform">
+      ${studs.length>1?`<div class="field"><label for="sf-who">Student</label><select id="sf-who">${studs.map(m=>`<option value="${esc(m.email.toLowerCase())}">${esc(m.name)}</option>`).join('')}</select></div>`:''}
+      <div class="field"><label for="sf-date">Date of test</label><input type="date" id="sf-date" value="${new Date().toISOString().slice(0,10)}"></div>
+      <div class="field"><label for="sf-name">Name (optional)</label><input type="text" id="sf-name" maxlength="80" placeholder="${U.name} test"></div>
+      <div class="field"><label for="sf-score">Points earned</label><input type="number" id="sf-score" step="0.5" min="0" inputmode="decimal" placeholder="83.5"></div>
+      <div class="field"><label for="sf-out">Out of</label><input type="number" id="sf-out" step="0.5" min="1" inputmode="decimal" value="100"></div>
+      <div class="field wide"><label>Topics where points were lost</label><div class="topics">${secs.map(x=>`<label><input type="checkbox" value="${x.id}"><span>${x.id} ${x.title}</span></label>`).join('')}</div></div>
+      <div class="field wide"><label for="sf-note">Note (optional)</label><input type="text" id="sf-note" maxlength="200" placeholder="e.g. ran out of time on the last page"></div>
+    </div>
+    <p class="msg" id="sf-msg" aria-live="polite"></p>
+    <div class="actions"><button type="submit" class="btn primary">Save school test</button></div></form>`
+    :`<p class="tip">${OWNER?'Connect to the progress log to add school tests.':'School test scores are added by a parent.'}</p>`;
+
+  app.innerHTML=`
+  <div class="bar"><button class="btn ghost" id="back">← All lessons</button><span class="eyebrow">Tests and weak spots</span></div>
+  <div class="head"><h1>Tests and weak spots</h1><p class="lede">Every test taken, how each lesson is holding up when it is tested, and what to practice next.</p>
+  <div class="actions"><button class="btn small" id="irefresh">Refresh</button><button class="btn small" id="toprog2">Full progress log</button></div></div>
+  ${people.length>1?`<div class="filters"><button class="fbtn ${FILTER==='all'?'on':''}" data-f="all">Everyone</button>${people.map(p=>`<button class="fbtn ${FILTER===p?'on':''}" data-f="${esc(p)}">${esc(who(p))}</button>`).join('')}</div>`:''}
+  <div class="tabs" role="tablist">${Object.entries(UNITS).sort((a,b)=>b[0]-a[0]).map(([id,u])=>`<button role="tab" class="tab ${id===IUNIT?'on':''}" aria-selected="${id===IUNIT}" data-iunit="${id}"><strong>${u.name}</strong><span>${u.title}</span></button>`).join('')}</div>
+
+  <div class="stats"><div><span class="big2">${unitReal.length}</span><span class="d">practice tests finished</span></div><div><span class="big2">${avg==null?'–':avg+'%'}</span><span class="d">average score</span></div><div><span class="big2">${bestPct==null?'–':bestPct+'%'}</span><span class="d">best score</span></div><div><span class="big2">${lastT?lastT.pct+'%':'–'}</span><span class="d">latest score</span></div></div>
+  ${unitReal.length>1?`<div class="actions" style="margin:6px 0 0"><span class="d">Practice test trend</span>${spark(unitReal.map(a=>a.pct))}</div>`:''}
+  ${nSkip||nUnfin?`<p class="tip" style="margin:6px 0 0">${[nSkip?`${nSkip} attempt${nSkip>1?'s':''} finished in under ${SKIP_MIN} minutes (skipped through)`:'',nUnfin?`${nUnfin} unfinished`:''].filter(Boolean).join(' and ')} left out of the scores above. Questions answered in unfinished tests still count in the lesson numbers, but skipped-through tests do not.</p>`:''}
+
+  <h2 class="sub">Which lessons need work</h2>
+  ${slips.length?`<p class="callout"><b>Practice looks better than the tests for ${slips.map(r=>r.sec.id).join(', ')}.</b> On a test the lesson is not named, so he has to pick the method himself. Re-doing the practice set for these is good, and so is working out which method each question needs before solving it.</p>`:''}
+  ${tests.length||rows.length?`<div class="hist">${lessonRows}</div>`:'<div class="card"><p style="margin:0">No sets yet for this unit.</p></div>'}
+  ${next.length?`<div class="card" style="margin-top:14px"><h3 style="margin:0">Practice these next</h3><div class="actions">${next.map(r=>`<button class="btn primary" data-go="${r.sec.id}">${r.sec.id} ${r.sec.title}</button>`).join('')}</div></div>`:''}
+
+  <h2 class="sub">Every test taken</h2>
+  ${tests.length?`<div class="table"><table><thead><tr><th>When</th><th>Test</th><th>Questions</th><th>Score</th><th>Time</th><th></th></tr></thead><tbody>${histRows}</tbody></table></div>`:'<div class="card"><p style="margin:0">No tests taken for this unit yet.</p></div>'}
+
+  <h2 class="sub">School tests</h2>
+  <p class="tip" style="margin:-4px 0 10px">The real tests from class. Adding them next to the practice results shows whether practice matches what happens on a test.</p>
+  ${schoolCmp}${schoolRows?`<div class="hist" style="margin-bottom:14px">${schoolRows}</div>`:''}
+  ${form}`;
+
+  document.getElementById('back').onclick=home;
+  document.getElementById('irefresh').onclick=()=>refresh();
+  document.getElementById('toprog2').onclick=progress;
+  app.querySelectorAll('[data-iunit]').forEach(b=>b.onclick=()=>{IUNIT=b.dataset.iunit;insights()});
+  app.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.f;insights()});
+  app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>start(b.dataset.go));
+  app.querySelectorAll('[data-conc]').forEach(b=>b.onclick=()=>concepts(unitOf(b.dataset.conc),b.dataset.conc));
+  app.querySelectorAll('details.att').forEach(d=>d.addEventListener('toggle',()=>{d.open?OPEN.add(d.dataset.id):OPEN.delete(d.dataset.id)}));
+  app.querySelectorAll('[data-srm]').forEach(b=>b.onclick=async()=>{
+    if(b.dataset.armed!=='1'){b.dataset.armed='1';b.textContent='Click again to remove for good';b.classList.add('danger');return}
+    b.disabled=true;const {error}=await SB.from('algebra_school_tests').delete().eq('id',b.dataset.srm);
+    if(error){b.textContent='Could not remove it. Try again.';b.disabled=false;b.dataset.armed=''}else refresh();
+  });
+  const f=document.getElementById('sform');
+  if(f){
+    f.addEventListener('input',()=>{f.dataset.dirty='1'});
+    f.addEventListener('submit',async e=>{
+      e.preventDefault();const m=document.getElementById('sf-msg'),v=id=>document.getElementById(id);
+      const score=parseFloat(v('sf-score').value),out=parseFloat(v('sf-out').value),on=v('sf-date').value;
+      const say=(t,c)=>{m.textContent=t;m.className='msg '+c};
+      if(!on)return say('Pick the date of the test.','bad');
+      if(!Number.isFinite(score)||score<0)return say('Enter the points earned, like 83.5.','bad');
+      if(!Number.isFinite(out)||out<=0)return say('Enter what the test was out of, like 100.','bad');
+      if(score>out)return say('Points earned cannot be more than the total.','bad');
+      const who=v('sf-who')?v('sf-who').value:(studs[0]?studs[0].email.toLowerCase():ME);
+      const topics=[...f.querySelectorAll('.topics input:checked')].map(i=>i.value);
+      const btn=f.querySelector('button[type=submit]');btn.disabled=true;say('Saving…','info');
+      const row={id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,7),student_email:who,unit:IUNIT,test_name:v('sf-name').value.trim()||null,taken_on:on,score,out_of:out,topics,note:v('sf-note').value.trim()||null,entered_by:ME};
+      const {error}=await SB.from('algebra_school_tests').insert(row);
+      if(error){btn.disabled=false;say('Could not save: '+error.message,'bad');return}
+      f.dataset.dirty='';await refresh();
+    });
+  }
+  window.scrollTo(0,0);
 }
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&VIEW==='quiz'&&document.getElementById('check')&&!e.target.closest('button')){e.preventDefault();check()}});
 home();
