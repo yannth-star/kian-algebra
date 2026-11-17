@@ -1505,6 +1505,7 @@ SG.negSq=()=>{const k=ri(2,7),v=pick([0,1,2]);let eq,val,st;
 SG.disc=W('3.9',GEN3['3.9'][0]);
 REVIEWS.sign3=[SG.neg,SG.subUnpaired,SG.cfm,SG.firstStep, SG.monoMul,SG.coefX2,SG.binTri,SG.monos, SG.soapFill,SG.cubeDiff,SG.cubeSum,SG.cubeGCF, SG.conj,SG.topMul,SG.realDiv,SG.iSq, SG.move,SG.addHalf,SG.negSq,SG.disc];
 function makeSet(sec){
+  if(typeof sec==='string'&&sec.startsWith('chk'))return makeCheck(sec);
   if(REVIEWS[sec]){const out=[];for(const g of REVIEWS[sec]){const r=g();(Array.isArray(r)?r:[r]).forEach(q=>out.push(q))}return out}
   if(sec==='test'||sec==='test3'||sec==='test4'){const u={test:'2',test3:'3',test4:'4'}[sec];const out=[];for(const s of SECTIONS.filter(x=>x.unit===u)){shuffle(GEN[s.id]).slice(0,2).forEach(g=>out.push({...g(),sec:s.id}))}return out}
   const gens=shuffle(GEN[sec]);const out=[];for(let i=0;i<6;i++)out.push({...gens[i%gens.length](),sec});return out;
@@ -1632,10 +1633,93 @@ const plain=h=>String(h||'').replace(/<br\s*\/?>/g,' / ').replace(/<span class="
 const ptsOf=r=>r==='first'?1:r==='retry'?.5:0;
 const cls=p=>p>=85?'good':p>=60?'half':'bad';
 const fmtDate=ms=>new Date(ms).toLocaleString('en-US',{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+/* ---- concept checks: closed-book questions on the key concepts; each has p (prompt), a (right answer), d (three wrong answers), why (the rule) ---- */
+const CHECKS={
+'4.1':[
+ {p:`A polynomial is written ${M('3x + 7x⁴ − 2x² + 1')}. What is its leading coefficient?`,a:M('7'),d:[M('3'),M('1'),M('−2')],why:`Put the terms in order first: ${M('7x⁴ − 2x² + 3x + 1')}. The leading term is the one with the largest exponent, not the first one written.`},
+ {p:`What is the degree of ${M('4x² + 9x⁵ − x³')}?`,a:M('5'),d:[M('9'),M('2'),M('4')],why:`The degree is the largest exponent, which is 5. The 9 is the coefficient, not the degree.`},
+ {p:`A polynomial has odd degree and a positive leading coefficient. What do the ends of the graph do?`,a:'Down on the left, up on the right',d:['Both ends up','Both ends down','Up on the left, down on the right'],why:`Odd degree: the ends go in opposite directions. Positive leading coefficient: down on the left, up on the right.`},
+ {p:`A polynomial has even degree and a negative leading coefficient. What do the ends of the graph do?`,a:'Both ends down',d:['Both ends up','Down on the left, up on the right','Up on the left, down on the right'],why:`Even degree: both ends go the same way. Negative leading coefficient: both down.`},
+ {p:`What is the y-intercept of ${M('f(x) = 2x³ − 5x + 8')}?`,a:M('8'),d:[M('2'),M('−5'),M('0')],why:`The y-intercept is the value at ${M('x = 0')}, which is the constant term, 8.`},
+ {p:`${M('f(x) = (x + 1)(2x − 3)(x + 4)')}. What are its degree and leading coefficient?`,a:'Degree 3, leading coefficient 2',d:['Degree 3, leading coefficient 1','Degree 2, leading coefficient 2','Degree 3, leading coefficient −3'],why:`Three factors with an ${M('x')} each give degree 3. Multiply the front numbers: ${M('1 · 2 · 1 = 2')}.`},
+ {p:`Which statement about end behavior is true?`,a:'Only the degree (odd or even) and the sign of the leading coefficient decide it',d:['Every term has an equal say in it','The constant term decides it','The smallest exponent decides it'],why:`Far from the origin the biggest power wins, so only the leading term matters for the ends of the graph.`}
+],
+'4.2':[
+ {p:`A polynomial has degree 5. What is the most turning points it can have?`,a:M('4'),d:[M('5'),M('6'),M('3')],why:`A polynomial of degree ${M('n')} has at most ${M('n − 1')} turning points.`},
+ {p:`A graph has 3 turning points. What is the smallest degree it can have?`,a:M('4'),d:[M('2'),M('3'),M('5')],why:`At most ${M('n − 1')} turning points means ${M('n − 1 ≥ 3')}, so ${M('n ≥ 4')}.`},
+ {p:`${M('g(x)')} is positive on ${M('(−5, −2) ∪ (4, ∞)')} and negative on ${M('(−∞, −5) ∪ (−2, 4)')}. What is the smallest possible degree?`,a:M('3'),d:[M('2'),M('4'),M('6')],why:`The sign changes at ${M('−5')}, ${M('−2')} and ${M('4')}. That is 3 zeros, so the degree is at least 3.`},
+ {p:`The graph is above the x-axis between the zeros ${M('−3')} and ${M('−1')}. How do you write where it is positive?`,a:M('(−3, −1)'),d:[M('[−3, −1]'),M('(−3, −1]'),M('[−3, −1)')],why:`At the zeros the function equals 0, which is not positive. Use parentheses for positive and negative intervals.`},
+ {p:`An even-degree polynomial opens upward and its lowest point is ${M('(2, 3)')}. What is its range?`,a:M('[3, ∞)'),d:[M('(−∞, 3]'),M('(3, ∞)'),M('(−∞, ∞)')],why:`The range is made of y-values. The lowest y is 3 and it is reached, so use a bracket at 3, and it goes up forever.`},
+ {p:`Which statement is true for every polynomial of odd degree?`,a:'Domain and range are both all real numbers',d:['The domain is all real numbers, but the range has a lowest or highest value','The domain has a lowest or highest value, but the range is all real numbers','The graph never crosses the x-axis'],why:`Odd degree: the ends go opposite ways, so the graph covers every y-value. The domain is all real numbers for every polynomial.`},
+ {p:`Which statement is true for every polynomial of even degree?`,a:'The domain is all real numbers, and the range has a lowest or highest value',d:['Domain and range are both all real numbers','The graph has no turning points','The range is all real numbers, and the domain has a lowest or highest value'],why:`Even degree: both ends go the same way, so the graph turns around and the range stops at a lowest or highest value.`},
+ {p:`A question asks for the range of a function. Which values do you read off the graph?`,a:'The y-values: how low and how high the graph reaches',d:['The x-values: how far left and right it goes','The x-intercepts only','The slopes of the steepest parts'],why:`Intervals where the function is positive or increasing are x-values. The range is the set of y-values.`}
+],
+'4.3':[
+ {p:`Divide ${M('(12x³ − 8x² + 4x) ÷ 4x')}.`,a:M('3x² − 2x + 1'),d:[M('3x³ − 2x² + x'),M('3x² − 2x'),M('3x² − 8x² + 4x')],why:`Divide each term by ${M('4x')}: divide the numbers and subtract the exponents. ${M('12x³ ÷ 4x = 3x²')}, ${M('−8x² ÷ 4x = −2x')}, ${M('4x ÷ 4x = 1')}.`},
+ {p:`${M('(x² + 3x − 20) ÷ (x − 4)')} has quotient ${M('x + 7')} and remainder 8. How do you write the whole answer?`,a:M('x + 7 + 8/(x − 4)'),d:[M('x + 7 + 8'),M('x + 7 − 8/(x − 4)'),M('8/(x − 4)')],why:`The remainder goes over the divisor: dividend ÷ divisor = quotient + remainder/divisor.`},
+ {p:`In long division, what do you do to the signs when you subtract the line you just multiplied?`,a:'Change the sign of every term you are subtracting',d:['Change only the first term','Change only the last term','Nothing: just subtract the numbers'],why:`Subtracting a whole line means changing the sign of every term in it. One missed sign ruins the rest of the problem.`},
+ {p:`You divide a polynomial by ${M('(x − 3)')} and the remainder is 0. What is true?`,a:M('(x − 3)')+' is a factor of the polynomial',d:[M('x = −3')+' is a zero','The quotient is 0','The polynomial has degree 3'],why:`Remainder 0 means dividend = (divisor)(quotient), so the divisor and the quotient are both factors.`},
+ {p:`Which equation connects the dividend, divisor, quotient and remainder?`,a:'dividend = divisor × quotient + remainder',d:['dividend = divisor + quotient + remainder','dividend = divisor × quotient − remainder','dividend = quotient ÷ divisor + remainder'],why:`It is the same as with numbers: ${M('17 = 5 × 3 + 2')}.`},
+ {p:`A question says "divide". What should your answer be?`,a:'The quotient, plus the remainder if there is one',d:['The dividend written in factored form','The divisor and the dividend multiplied','Only the remainder'],why:`Dividing produces a quotient and a remainder. Factoring the dividend is a different job.`},
+ {p:`${M('(x² + 5x + 6) ÷ (x + 2)')} equals what?`,a:M('x + 3'),d:[M('x − 3'),M('x + 4'),M('x² + 3')],why:`Divide: ${M('x² ÷ x = x')}, then ${M('3x ÷ x = 3')}, remainder 0. Check: ${M('(x + 2)(x + 3) = x² + 5x + 6')}.`}
+],
+'4.4':[
+ {p:`You are dividing ${M('(x³ − 8) ÷ (x − 2)')}. How do you set up the dividend?`,a:M('x³ + 0x² + 0x − 8'),d:[M('x³ − 8'),M('x³ + x² + x − 8'),M('x³ − 8x')],why:`Missing powers get placeholders with a 0 coefficient, so the columns line up.`},
+ {p:`The dividend is written ${M('5 + x² − 3x')}. What do you do first?`,a:'Rewrite it from the largest exponent to the smallest',d:['Divide by 5 first','Move the constant to the middle','Nothing: long division works in any order'],why:`Always put the dividend and divisor in descending order before you start.`},
+ {p:`When do you stop dividing in long division?`,a:'When the degree of what is left is smaller than the degree of the divisor',d:['When the quotient has three terms','When every term has been used once','When you reach a negative number'],why:`Once what is left has a smaller degree than the divisor, you cannot divide any further. That leftover is the remainder.`},
+ {p:`The divisor is ${M('x² + 2x + 1')} (three terms). After you find the next quotient term, what do you multiply it by?`,a:'All three terms of the divisor',d:['Only the first term of the divisor','Only the first two terms of the divisor','The dividend'],why:`Multiply back across the whole divisor, then subtract the whole line.`},
+ {p:`Which one needs placeholders before you divide it by ${M('(x − 1)')}?`,a:M('x⁴ − 3x² + 2'),d:[M('x³ + x² + x + 1'),M('2x² − 5x + 1'),M('x⁴ + x³ + x² + x + 1')],why:`${M('x⁴ − 3x² + 2')} has no ${M('x³')} term and no ${M('x')} term. The others have every power.`},
+ {p:`${M('x³ − 8')} divided by ${M('x − 2')} gives ${M('x² + 2x + 4')} with remainder 0. How do you write ${M('x³ − 8')} as a product?`,a:M('(x − 2)(x² + 2x + 4)'),d:[M('(x + 2)(x² + 2x + 4)'),M('(x − 2) + (x² + 2x + 4)'),M('(x − 2)(x² − 2x + 4)')],why:`Remainder 0 means dividend = (divisor)(quotient).`},
+ {p:`The divisor ${M('x − 4')} has a missing power. Which sentence is correct?`,a:'Any missing power in the dividend or the divisor gets a 0 placeholder',d:['Only the divisor needs placeholders','Only the dividend needs placeholders','Placeholders are only needed when the remainder is not 0'],why:`Every missing power needs a placeholder, in the dividend and in the divisor, so the columns line up.`}
+],
+'4.5':[
+ {p:`You use synthetic division to divide by ${M('(x + 5)')}. What goes in the box?`,a:M('−5'),d:[M('5'),M('1'),M('−1')],why:`For ${M('x − k')} the box holds ${M('k')}. ${M('x + 5 = x − (−5)')}, so the box holds ${M('−5')}.`},
+ {p:`What is the top row of coefficients for ${M('3x³ − 4x + 9')}?`,a:M('3, 0, −4, 9'),d:[M('3, −4, 9'),M('3, 4, 9'),M('9, −4, 0, 3')],why:`List the coefficients in descending order and put a 0 for every missing term. There is no ${M('x²')} term here.`},
+ {p:`You divide ${M('f(x)')} by ${M('(x − 2)')} synthetically and the last number is 25. What does 25 tell you?`,a:'The remainder, and also '+M('f(2) = 25'),d:['The constant term of the quotient','That '+M('x = 25')+' is a zero','That '+M('(x − 25)')+' is a factor'],why:`The last number is the remainder. By the remainder theorem it equals ${M('f(k)')}, here ${M('f(2)')}.`},
+ {p:`Which divisor can you use with synthetic division?`,a:M('x − 4'),d:[M('2x − 3'),M('x² − 4'),M('(x − 1)(x + 2)')],why:`Synthetic division works when the divisor is ${M('x − k')}, with 1 as the coefficient of ${M('x')}.`},
+ {p:`Dividing ${M('f(x)')} by ${M('x − 4')} synthetically leaves remainder 0. What is true?`,a:M('f(4) = 0')+' and '+M('(x − 4)')+' is a factor',d:[M('f(−4) = 0'),M('f(0) = 4'),M('x = 4')+' is not a zero'],why:`Remainder 0 means ${M('f(4) = 0')}, so 4 is a zero and ${M('x − 4')} is a factor.`},
+ {p:`The bottom row of a synthetic division is ${M('2, 7, 9, 25')}. What is the result?`,a:'Quotient '+M('2x² + 7x + 9')+', remainder 25',d:['Quotient '+M('2x³ + 7x² + 9x')+', remainder 25','Quotient '+M('2x³ + 7x² + 9x + 25')+', remainder 0','Quotient '+M('2x² + 7x + 25')+', remainder 9'],why:`The last number is the remainder. The others are the coefficients of the quotient, which has one degree less than the dividend.`},
+ {p:`The remainder theorem says the remainder when ${M('f(x)')} is divided by ${M('x − k')} is:`,a:M('f(k)'),d:[M('f(−k)'),M('f(0)'),M('k')],why:`Dividing by ${M('x − k')} leaves ${M('f(k)')}.`}
+],
+'4.6':[
+ {p:`What is the zero of the factor ${M('(2x + 1)')}?`,a:M('−1/2'),d:[M('−1'),M('1/2'),M('2')],why:`Solve ${M('2x + 1 = 0')}: ${M('x = −1/2')}.`},
+ {p:`What is the zero of the factor ${M('(x + 3)')}?`,a:M('−3'),d:[M('3'),M('1/3'),M('−1/3')],why:`The zero has the opposite sign of the number in the factor.`},
+ {p:`The factor ${M('(x − 4)²')} appears in a polynomial. What does the graph do at ${M('x = 4')}?`,a:'Touches the x-axis and turns around',d:['Crosses the x-axis like a straight line','Crosses the x-axis and flattens out','Does not touch the x-axis'],why:`Even multiplicity: the graph touches the x-axis and turns around.`},
+ {p:`The factor ${M('(x − 4)³')} appears in a polynomial. What does the graph do at ${M('x = 4')}?`,a:'Crosses the x-axis but flattens out',d:['Touches the x-axis and turns around','Crosses the x-axis like a straight line','Stays above the x-axis'],why:`Odd multiplicity above 1: the graph crosses the x-axis but flattens out there.`},
+ {p:`What is the degree of ${M('(x + 7)²(x − 4)³(2x + 1)')}?`,a:M('6'),d:[M('3'),M('5'),M('12')],why:`Add all the exponents: ${M('2 + 3 + 1 = 6')}.`},
+ {p:`How does the graph of ${M('(x + 1)(x − 3)²')} behave at its zeros?`,a:'It crosses at '+M('−1')+' and touches and turns at '+M('3'),d:['It crosses at both zeros','It touches and turns at both zeros','It crosses at '+M('1')+' and touches and turns at '+M('−3')],why:`${M('x = −1')} has multiplicity 1, so it crosses. ${M('x = 3')} has multiplicity 2, so it touches and turns.`},
+ {p:`A polynomial has zeros ${M('−2')} and ${M('3')} and passes through ${M('(0, −12)')}. What is ${M('a')} in ${M('y = a(x + 2)(x − 3)')}?`,a:M('2'),d:[M('−2'),M('6'),M('−6')],why:`Plug in the point: ${M('−12 = a(0 + 2)(0 − 3) = −6a')}, so ${M('a = 2')}.`}
+],
+'4.7':[
+ {p:`A polynomial has degree 5. How many solutions does it have, counting repeats and imaginary ones?`,a:M('5'),d:[M('4'),M('3'),M('10')],why:`The Fundamental Theorem of Algebra: exactly as many solutions as the degree, counting repeated and imaginary ones.`},
+ {p:`A polynomial with real coefficients has the zero ${M('3 + 2i')}. Which number must also be a zero?`,a:M('3 − 2i'),d:[M('−3 + 2i'),M('−3 − 2i'),M('2 + 3i')],why:`Imaginary zeros come in conjugate pairs: ${M('a + bi')} and ${M('a − bi')}.`},
+ {p:`A degree-4 polynomial with real coefficients has exactly 2 real solutions (counting repeats). How many imaginary solutions does it have?`,a:M('2'),d:[M('0'),M('1'),M('4')],why:`There are 4 solutions in all, so 2 are imaginary. Imaginary solutions come in pairs.`},
+ {p:`Why do imaginary solutions not show up on the graph?`,a:'The graph only shows real numbers, so only real zeros appear as x-intercepts',d:['Imaginary numbers are not solutions','They are always repeated solutions','Graphs only show positive solutions'],why:`The theorem counts all solutions. Imaginary ones are real solutions of the equation, but they are not points on the x-axis.`},
+ {p:`After dividing out the known factors you are left with ${M('x² + 4')}. What are its solutions?`,a:M('x = 2i')+' and '+M('x = −2i'),d:[M('x = 2')+' and '+M('x = −2'),M('x = 4i')+' and '+M('x = −4i'),'It has no solutions'],why:`${M('x² + 4 = 0')} gives ${M('x² = −4')}, so ${M('x = ±2i')}.`},
+ {p:`The graph of a polynomial passes through the origin. What must be true?`,a:M('x')+' is a factor',d:[M('(x − 1)')+' is a factor','The constant term is 1','It has no imaginary zeros'],why:`Passing through the origin means ${M('f(0) = 0')}, so 0 is a zero and ${M('x')} is a factor.`},
+ {p:`You are given one zero of a polynomial and asked for all the solutions. What do you do?`,a:'Divide by the matching factor, then factor or use the quadratic formula on what is left, and list every zero',d:['Graph it and read the x-intercepts','Set the polynomial equal to 1 and solve','Divide by the zero itself instead of its factor'],why:`Divide by the factor ${M('(x − r)')}, solve the quotient, and list every solution, including imaginary ones.`}
+]
+};
+const CHECK_N=4,CHECK_PASS=75;
+
+const isCheck=sec=>typeof sec==='string'&&sec.startsWith('chk');
+function makeCheck(sec){const l=sec.slice(3);return shuffle(CHECKS[l]).slice(0,CHECK_N).map(c=>({type:'mc',sec,prompt:c.p,...mc(c.a,c.d),hint:'',steps:[c.why]}))}
+const unlockedHere=()=>{try{return localStorage.getItem('alg-unlock')==='1'}catch(e){return false}};
+const gated=()=>!OWNER&&!unlockedHere();
+function checkPassed(l){const k='chk'+l;const me=(ME||'').toLowerCase()||null;
+  const ps=finishedFor(k,me).map(a=>a.pct);if(!me){const lp=local.get()[k];if(lp!=null)ps.push(lp)}
+  return ps.length>0&&Math.max(...ps)>=CHECK_PASS}
+function gateFor(sec){
+  if(!gated())return null;
+  if(CHECKS[sec]&&!checkPassed(sec))return {kind:'lesson',lesson:sec};
+  if(sec==='test4'){const m=Object.keys(CHECKS).filter(l=>!checkPassed(l));if(m.length)return {kind:'test',missing:m}}
+  return null;
+}
+const fmtRead=secs=>!secs?'no reading logged':secs<60?`${secs} sec`:`${Math.round(secs/60)} min`;
 const isTest=sec=>sec==='test'||sec==='test3'||sec==='test4'||!!REVIEW_NAMES[sec];
-const unitOf=sec=>sec==='test'?'2':sec==='test3'?'3':sec==='test4'?'4':REVIEW_NAMES[sec]?'3':sec[0];
+const unitOf=sec=>isCheck(sec)?sec[3]:sec==='test'?'2':sec==='test3'?'3':sec==='test4'?'4':REVIEW_NAMES[sec]?'3':sec[0];
 const secObj=sec=>SECTIONS.find(s=>s.id===sec);
-const secName=sec=>REVIEW_NAMES[sec]?REVIEW_NAMES[sec]:isTest(sec)?`${UNITS[unitOf(sec)].name} practice test`:`${sec} ${secObj(sec).title}`;
+const secName=sec=>isCheck(sec)?`${sec.slice(3)} ${secObj(sec.slice(3)).title}: concept check`:REVIEW_NAMES[sec]?REVIEW_NAMES[sec]:isTest(sec)?`${UNITS[unitOf(sec)].name} practice test`:`${sec} ${secObj(sec).title}`;
 const title=secName;
 const who=uid=>NAMES[uid]||(uid&&uid===ME?'You':(uid||'Student'));
 const unitSecs=u=>SECTIONS.filter(s=>s.unit===u);
@@ -1747,16 +1831,19 @@ async function flushReads(){
 }
 let CONC=null;
 function leaveConcepts(){
-  if(!CONC)return;const c=CONC;CONC=null;if(c.obs)c.obs.disconnect();Object.values(c.timers).forEach(clearTimeout);
+  if(!CONC)return;const c=CONC;CONC=null;if(c.obs)c.obs.disconnect();if(c.iv)clearInterval(c.iv);Object.values(c.timers).forEach(clearTimeout);Object.entries(c.dw||{}).forEach(([sec,n])=>{if(n>=3)logRead(c.u,'btime',sec,n)});
   const ms=c.ms+(c.since?Date.now()-c.since:0),secs=Math.round(ms/1000);if(secs>=2)logRead(c.u,'time',null,secs);
 }
 function trackConcepts(u){
-  CONC={u,since:document.visibilityState==='visible'?Date.now():0,ms:0,seen:new Set(),timers:{},obs:null};const c=CONC;
+  CONC={u,since:document.visibilityState==='visible'?Date.now():0,ms:0,seen:new Set(),timers:{},obs:null,vis:new Set(),dw:{},iv:null};const c=CONC;
   if(!('IntersectionObserver' in window))return;
-  c.obs=new IntersectionObserver(es=>es.forEach(e=>{const sec=e.target.dataset.sec;if(!sec||c.seen.has(sec))return;
+  c.obs=new IntersectionObserver(es=>es.forEach(e=>{const sec=e.target.dataset.sec;if(!sec)return;
+    if(e.isIntersecting)c.vis.add(sec);else c.vis.delete(sec);
+    if(c.seen.has(sec))return;
     if(e.isIntersecting){if(!c.timers[sec])c.timers[sec]=setTimeout(()=>{if(CONC===c&&document.visibilityState==='visible'){c.seen.add(sec);logRead(u,'block',sec)}},4000)}
-    else{clearTimeout(c.timers[sec]);delete c.timers[sec]}}),{threshold:0.35});
+    else{clearTimeout(c.timers[sec]);delete c.timers[sec]}}),{threshold:0,rootMargin:'-30% 0px -30% 0px'});
   app.querySelectorAll('.concept[data-sec]').forEach(el=>c.obs.observe(el));
+  c.iv=setInterval(()=>{if(CONC!==c||document.visibilityState!=='visible')return;c.vis.forEach(sec=>{c.dw[sec]=(c.dw[sec]||0)+1})},1000);
 }
 async function signOut(){try{await SB.auth.signOut()}catch(e){}SESSION=null;afterAuth()}
 function loginView(){
@@ -1821,16 +1908,17 @@ function home(){
   <p class="lede">Read the key concepts, then practice. Every set has new numbers, so you can run as many sets as you want.</p>
   ${ME?`<p class="who">Signed in as <b>${esc(NAMES[ME]||ME)}</b> · <button class="linkbtn" id="signout">Sign out</button></p>`:''}</div>
   <div class="tabs" role="tablist">${Object.entries(UNITS).sort((a,b)=>b[0]-a[0]).map(([id,u])=>`<button role="tab" class="tab ${id===UNIT?'on':''}" aria-selected="${id===UNIT}" data-unit="${id}"><strong>${u.name}</strong><span>${u.title}</span></button>`).join('')}</div>
+  <button class="progbtn" id="toins"><span><strong>Tests and weak spots</strong><span class="d">Every test taken, scores over time, and which lessons need the most work.</span></span><span aria-hidden="true">→</span></button>
   <div class="duo">
-    <button class="concard" id="toconcepts"><span class="eyebrow">Start here</span><strong>${U.name} key concepts</strong><span class="d">Rules, a worked example and common mistakes for each lesson, ${first} to ${last}.</span><span class="go">Read →</span></button>
+    <button class="concard" id="toconcepts"><span class="eyebrow">Start here</span><strong>${U.name} key concepts</strong><span class="d">Rules, a worked example and common mistakes for each lesson, ${first} to ${last}.${CHECKS[first]?' Each lesson ends with a short concept check that unlocks its practice. Your reading time is recorded.':''}</span><span class="go">Read →</span></button>
     ${(()=>{const pz=pausedFor(U.test);return pz?`<div class="test"><div><h2>Test in progress</h2><p>${pz.done} of ${pz.total} answered. Pick up where you stopped. ${bt!=null?`Best so far: ${bt}%.`:''}</p></div><div class="actions"><button class="btn" id="resumetest">Resume test</button><button class="btn ghost" style="color:inherit" data-go="${U.test}">Start a new one</button></div></div>`
+    :gateFor(U.test)?`<div class="test"><div><h2>Practice test</h2><p>Locked until you pass the concept check for every lesson (${Object.keys(CHECKS).filter(checkPassed).length} of ${Object.keys(CHECKS).length} passed).</p></div><button class="btn" data-go="${U.test}">What is left</button></div>`
     :`<div class="test"><div><h2>Practice test</h2><p>${secs.length*2} questions, 2 from each lesson. ${bt!=null?`Best so far: ${bt}%.`:''}</p></div><button class="btn" data-go="${U.test}">Start test</button></div>`})()}
   </div>
   ${U.reviews?`<h2 class="sub">Unit review practice</h2><p class="tip" style="margin:-4px 0 10px">R1 and R2 follow the teacher's ${U.name} review sheet. ± drills the sign rules. New numbers every time.</p>
   <div class="list" style="margin-bottom:20px">${U.reviews.map((r,i)=>{const n=finishedFor(r,FILTER==='all'?null:FILTER).length;return `<button class="row" data-go="${r}"><span class="num">${REVIEW_TAG[r]}</span><span><span class="t">${REVIEW_NAMES[r]}</span><span class="d">${REVIEW_DESC[r]}${n?` · ${n} done`:''}</span></span>${chip(best(r))}</button>`}).join('')}</div>
   <h2 class="sub">Lessons</h2>`:''}
-  <div class="list">${secs.map(s=>{const n=finishedFor(s.id,FILTER==='all'?null:FILTER).length;return `<button class="row" data-go="${s.id}"><span class="num">${s.id}</span><span><span class="t">${s.title}</span><span class="d">${s.desc}${n?` · ${n} set${n>1?'s':''} done`:''}</span></span>${chip(best(s.id))}</button>`}).join('')}</div>
-  <button class="progbtn" id="toins"><span><strong>Tests and weak spots</strong><span class="d">Every test taken, scores over time, and which lessons need the most work.</span></span><span aria-hidden="true">→</span></button>
+  <div class="list">${secs.map(s=>{const n=finishedFor(s.id,FILTER==='all'?null:FILTER).length;return `<button class="row" data-go="${s.id}"><span class="num">${s.id}</span><span><span class="t">${s.title}</span><span class="d">${s.desc}${n?` · ${n} set${n>1?'s':''} done`:''}${CHECKS[s.id]?(checkPassed(s.id)?' · concept check passed':' · read, then pass the concept check'):''}</span></span>${gateFor(s.id)?'<span class="chip half">Check first</span>':chip(best(s.id))}</button>`}).join('')}</div>
   <button class="progbtn" id="toprog"><span><strong>Progress log</strong><span class="d">${sets?`${sets} set${sets>1?'s':''} saved. See scores over time and every missed question.`:'Every set is saved here as you go.'}</span></span><span aria-hidden="true">→</span></button>
   <p class="how">Scoring: right on the first try is 1 point, right after a retry is ½ point, and using “Show solution” is 0. Type fractions like <span class="m">3/4</span>, powers like <span class="m">x^2</span>.</p>
   <p class="tip" id="savenote">${saveNoteText()}</p>`;
@@ -1844,11 +1932,13 @@ function home(){
 }
 
 /* ---- key concepts ---- */
-function concepts(u,jump){
+function concepts(u,jump,why){
   leaveConcepts();VIEW='concepts';S=null;const U=UNITS[u],secs=unitSecs(u);
   app.innerHTML=`
   <div class="bar"><button class="btn ghost" id="back">← All lessons</button><span class="eyebrow">${U.name} key concepts</span></div>
-  <div class="head"><h1>${U.name}: ${U.title}</h1><p class="lede">One block per lesson: the big idea, the rules to know, a worked example and the mistakes that cost points. Read a block, then practice that lesson.</p></div>
+  <div class="head"><h1>${U.name}: ${U.title}</h1><p class="lede">One block per lesson: the big idea, the rules to know, a worked example and the mistakes that cost points. Read a block, then ${Object.keys(CHECKS).includes(secs[0].id)?'pass its short concept check to unlock the practice':'practice that lesson'}.</p></div>
+  <div class="callout"><strong>Your reading time is recorded.</strong> The time you spend on each lesson here, and your concept check results, are saved to your progress log and your parent can see them.</div>
+  ${why==='lesson'?`<div class="callout"><strong>${jump} practice is locked.</strong> Read the ${jump} block below, then take its concept check (${CHECK_N} questions, closed book, ${Math.ceil(CHECK_PASS*CHECK_N/100)} right to pass).</div>`:why==='test'?`<div class="callout"><strong>The ${U.name} practice test is locked.</strong> It opens once you pass the concept check for every lesson. Still to pass: ${Object.keys(CHECKS).filter(l=>!checkPassed(l)).join(', ')}.</div>`:why==='retry'?`<div class="callout"><strong>Reread ${jump}, then try the check again.</strong> The questions come from a pool, so you will see new ones.</div>`:''}
   <nav class="jump" aria-label="Lessons">${secs.map(s=>`<button class="fbtn" data-jump="${s.id}">${s.id}</button>`).join('')}</nav>
   <div class="concepts">${secs.map(s=>{const c=CONCEPTS[s.id];return `
     <section class="concept" id="c-${s.id.replace('.','-')}" data-sec="${s.id}">
@@ -1857,9 +1947,12 @@ function concepts(u,jump){
       <dl class="rules">${c.rules.map(([k,v])=>`<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
       <div class="ex"><span class="eyebrow">Worked example</span><p>${c.ex.q}</p><ol>${c.ex.steps.map(x=>`<li>${x}</li>`).join('')}</ol></div>
       <div class="watch"><span class="eyebrow">Watch out</span><ul>${c.watch.map(x=>`<li>${x}</li>`).join('')}</ul></div>
-      <div class="actions"><button class="btn primary" data-go="${s.id}">Practice ${s.id}</button></div>
+      ${CHECKS[s.id]?(()=>{const ok=checkPassed(s.id),lock=gated()&&!ok;return `<div class="actions">${ok?'<span class="chip good">Concept check passed</span>':''}<button class="btn ${lock?'primary':'ghost'}" data-chk="${s.id}">${ok?'Retake the concept check':`Take the concept check (${CHECK_N} questions)`}</button>${lock?`<button class="btn" disabled>Practice ${s.id} (locked)</button>`:`<button class="btn primary" data-go="${s.id}">Practice ${s.id}</button>`}</div>`})():`<div class="actions"><button class="btn primary" data-go="${s.id}">Practice ${s.id}</button></div>`}
     </section>`}).join('')}</div>
-  <div class="test" style="margin-top:20px"><div><h2>Ready?</h2><p>Take the ${U.name} practice test: ${secs.length*2} questions from every lesson.</p></div><button class="btn" data-go="${U.test}">${pausedFor(U.test)?'Resume test':'Start test'}</button></div>`;
+  <div class="test" style="margin-top:20px"><div><h2>Ready?</h2><p>${gateFor(U.test)?`The ${U.name} practice test unlocks after you pass the concept check for every lesson.`:`Take the ${U.name} practice test: ${secs.length*2} questions from every lesson.`}</p></div>${gateFor(U.test)?'<button class="btn" disabled>Locked</button>':`<button class="btn" data-go="${U.test}">${pausedFor(U.test)?'Resume test':'Start test'}</button>`}</div>
+  ${OWNER&&CHECKS[secs[0].id]?`<p class="tip" style="margin-top:14px">Parent: practice and tests are never locked while you are signed in as a parent. <button class="linkbtn" id="unl">${unlockedHere()?'Turn the locks back on for this device':'Unlock everything for Kian on this device'}</button></p>`:''}`;
+  app.querySelectorAll('[data-chk]').forEach(b=>b.onclick=()=>start('chk'+b.dataset.chk));
+  const unl=document.getElementById('unl');if(unl)unl.onclick=()=>{try{unlockedHere()?localStorage.removeItem('alg-unlock'):localStorage.setItem('alg-unlock','1')}catch(e){}concepts(u,jump,why)};
   document.getElementById('back').onclick=home;
   app.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>(isTest(b.dataset.go)?openTest:start)(b.dataset.go));
   app.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>document.getElementById('c-'+b.dataset.jump.replace('.','-')).scrollIntoView({behavior:'smooth',block:'start'}));
@@ -1878,8 +1971,10 @@ function pausedFor(sec){
   const done=(p.res||[]).filter(Boolean).length;if(done<1||done>=p.qs.length)return null;
   return {...p,done,total:p.qs.length};
 }
-function start(sec){leaveConcepts();clearPaused(sec);S={sec,qs:makeSet(sec),i:0,res:[],items:[],started:Date.now(),ref:null};VIEW='quiz';show();window.scrollTo(0,0)}
+function blocked(g){if(g.kind==='lesson')concepts(unitOf(g.lesson),g.lesson,'lesson');else concepts('4',g.missing[0],'test')}
+function start(sec){const g=gateFor(sec);if(g)return blocked(g);leaveConcepts();clearPaused(sec);S={sec,qs:makeSet(sec),i:0,res:[],items:[],started:Date.now(),ref:null};VIEW='quiz';show();window.scrollTo(0,0)}
 function resume(sec){
+  const g=gateFor(sec);if(g)return blocked(g);
   const p=pausedFor(sec);if(!p)return start(sec);
   leaveConcepts();const res=p.res.map(r=>r||undefined);let i=0;while(i<p.qs.length&&res[i])i++;
   S={sec,qs:p.qs,i,res,items:p.items.map(x=>x||undefined),started:p.started,lid:p.lid,ref:null};
@@ -1898,16 +1993,16 @@ function show(){
   const n=S.qs.length;
   app.innerHTML=`
   <div class="bar"><button class="btn ghost" id="back">← All lessons</button><span class="eyebrow">${title(S.sec)}</span></div>
-  <div class="bar"><strong>Question ${S.i+1} of ${n}</strong><button class="btn ghost small" id="peek">Key concepts for ${q.sec}</button></div>
+  <div class="bar"><strong>Question ${S.i+1} of ${n}</strong><button class="btn ghost small" id="peek" ${isCheck(S.sec)?'hidden':''}>Key concepts for ${q.sec}</button></div>
   <div class="prog">${S.qs.map((_,j)=>`<span class="${S.res[j]||(j===S.i?'cur':'')}"></span>`).join('')}</div>
   <div class="card">
-    ${isTest(S.sec)?`<span class="tag">${secName(q.sec)}</span>`:''}
+    ${isTest(S.sec)?`<span class="tag">${secName(q.sec)}</span>`:isCheck(S.sec)?`<span class="tag">Closed book: one try per question</span>`:''}
     <p class="prompt">${q.prompt}</p>
     ${q.eq?EQ(q.eq):''}${q.eqHTML||''}${q.graph||''}
     ${q.type==='mc'?`<div class="choices">${q.choices.map((c,j)=>`<button class="choice" data-i="${j}"><span class="k">${'ABCD'[j]}</span><span>${c}</span></button>`).join('')}</div>`
       :`<div class="fields">${q.fields.map(fieldHTML).join('')}</div>`}
     <p class="msg" id="msg" aria-live="polite"></p>
-    <div class="actions"><button class="btn primary" id="check">Check</button><button class="btn" id="hintb">Hint</button><button class="btn ghost" id="reveal">Show solution</button></div>
+    <div class="actions"><button class="btn primary" id="check">Check</button><button class="btn" id="hintb" ${isCheck(S.sec)?'hidden':''}>Hint</button><button class="btn ghost" id="reveal" ${isCheck(S.sec)?'hidden':''}>Show solution</button></div>
     <div id="extra"></div>
   </div>
   <div id="peekbox"></div>
@@ -1930,6 +2025,7 @@ function check(){
     if(S.pick==null)return msg('Pick an answer first.','info');
     const btn=app.querySelector(`.choice[data-i="${S.pick}"]`);
     if(S.pick===q.correct){btn.classList.remove('sel');btn.classList.add('ok');finish(S.tries===0?'first':'retry')}
+    else if(isCheck(S.sec)){S.wrong.push(plain(q.choices[S.pick]));btn.classList.remove('sel');btn.classList.add('no');app.querySelectorAll('.choice').forEach(b=>{if(+b.dataset.i===q.correct)b.classList.add('ok')});finish('shown');msg('Not quite. The right answer is marked in green. Read why below.','bad')}
     else{S.tries++;S.wrong.push(plain(q.choices[S.pick]));btn.classList.remove('sel');btn.classList.add('no');S.pick=null;msg('Not quite. Try another choice, or use the hint.','bad')}
     return;
   }
@@ -1965,7 +2061,27 @@ function reveal(){
   finish('shown');
 }
 function next(){S.i++;if(S.i>=S.qs.length)summary();else{show();window.scrollTo(0,0)}}
+function checkSummary(){
+  VIEW='summary';const sec=S.sec,l=sec.slice(3),n=S.qs.length;
+  const pts=S.res.reduce((a,r)=>a+ptsOf(r),0),pct=Math.round(100*pts/n),pass=pct>=CHECK_PASS;local.set(sec,pct);
+  const miss=S.qs.map((q,j)=>({q,r:S.res[j]})).filter(x=>x.r!=='first');
+  app.innerHTML=`
+  <div class="bar"><button class="btn ghost" id="back">← All lessons</button><span class="eyebrow">${title(sec)}</span></div>
+  <div class="card">
+    <div class="score"><span class="big">${pct}%</span><span>${fmtScore(pts)} of ${n} points</span></div>
+    <p style="margin:0"><strong>${pass?`Passed. ${l} practice is unlocked.`:`Not yet. You need ${CHECK_PASS}% (${Math.ceil(CHECK_PASS*n/100)} of ${n}) to unlock ${l} practice.`}</strong> ${pass?'Now the practice will go much faster.':'Go back through the lesson, then try again. Each try has new questions from the pool.'}</p>
+    ${miss.length?`<h3>Missed</h3><ol class="recap">${miss.map(x=>`<li><i class="dot shown"></i><span>${esc(plain(x.q.prompt))}<br><b>Answer:</b> ${esc(plain(x.q.choices[x.q.correct]))}</span></li>`).join('')}</ol>`:''}
+    <div class="actions">${pass?`<button class="btn primary" id="go">Practice ${l}</button>`:`<button class="btn primary" id="rc">Reread ${l}</button><button class="btn" id="again">Try the check again</button>`}<button class="btn" id="home2">All lessons</button></div>
+    <p class="tip" id="savenote">${saveNoteText()}</p>
+  </div>`;
+  document.getElementById('back').onclick=home;document.getElementById('home2').onclick=home;
+  const g=document.getElementById('go');if(g)g.onclick=()=>start(l);
+  const rc=document.getElementById('rc');if(rc)rc.onclick=()=>concepts(unitOf(sec),l,'retry');
+  const ag=document.getElementById('again');if(ag)ag.onclick=()=>start(sec);
+  window.scrollTo(0,0);
+}
 function summary(){
+  if(isCheck(S.sec))return checkSummary();
   VIEW='summary';
   const pts=S.res.reduce((a,r)=>a+ptsOf(r),0),n=S.qs.length,pct=Math.round(100*pts/n);
   local.set(S.sec,pct);
@@ -2007,7 +2123,7 @@ function progress(){
   if(FILTER!=='all'&&!people.includes(FILTER))FILTER='all';
   const rows=ALL.filter(a=>FILTER==='all'||a.uid===FILTER);
   const reads=READS.filter(a=>FILTER==='all'||a.uid===FILTER);
-  const fin=rows.filter(a=>a.finished);
+  const fin=rows.filter(a=>a.finished&&!isCheck(a.sec));
   const avg=fin.length?Math.round(fin.reduce((t,a)=>t+a.pct,0)/fin.length):null;
   const qCount=rows.reduce((t,a)=>t+(a.answered||0),0);
   const unitTable=u=>{const U=UNITS[u],secs=[...unitSecs(u).map(s=>s.id),U.test,...(U.reviews||[])],rd=reads.filter(r=>r.unit===u);
@@ -2119,7 +2235,9 @@ function insights(){
     const chips=[`<span class="chip ${v.tone}">${v.label}</span>`,
       st.tn?`<span class="chip">Test ${st.tn>=MIN_Q?pct0(st.tf,st.tn)+'%':'?'} · ${st.tn} q</span>`:'<span class="chip">No test yet</span>',
       st.pn?`<span class="chip">Practice ${st.pn>=MIN_Q?pct0(st.pf,st.pn)+'%':'?'} · ${st.pn} q</span>`:'',
-      st.school?`<span class="chip bad">Lost points at school${st.school>1?` ×${st.school}`:''}</span>`:''].join('');
+      st.school?`<span class="chip bad">Lost points at school${st.school>1?` ×${st.school}`:''}</span>`:'',
+      CHECKS[x.id]?(()=>{const ck=rows.filter(a=>a.sec==='chk'+x.id&&a.finished),bp=ck.length?Math.max(...ck.map(a=>a.pct)):null,rs=READS.filter(r=>(FILTER==='all'||r.uid===FILTER)&&r.kind==='btime'&&r.sec===x.id).reduce((a,r)=>a+(r.secs||0),0);
+        return `<span class="chip ${rs>=120?'good':rs?'half':'bad'}">Read: ${fmtRead(rs)}</span><span class="chip ${bp==null?'bad':bp>=CHECK_PASS?'good':'half'}">${bp==null?'Concept check not taken':`Concept check ${bp}%${ck.length>1?` · ${ck.length} tries`:''}`}</span>`})():''].join('');
     return `<details class="att wk" data-id="ins-${x.id}"${OPEN.has('ins-'+x.id)?' open':''}><summary><span class="when">${x.id}</span><span class="what"><strong>${x.title}</strong></span><span class="res">${chips}</span></summary>
       <div class="attbody">
         <p class="d" style="margin:0">${st.tn?`On tests: ${pct0(st.tf,st.tn)}% right first try, ${pct0(st.tr,st.tn)}% after a retry, ${pct0(st.ts,st.tn)}% needed the solution${st.help?`, and ${pct0(st.help,st.tn)}% used a hint or the key concepts`:''}.`:'No test questions from this lesson yet.'} ${st.pn?`In lesson practice: ${pct0(st.pf,st.pn)}% right first try (${st.pn} questions).`:'No lesson practice yet.'} Percentages need at least ${MIN_Q} questions to be shown.</p>
